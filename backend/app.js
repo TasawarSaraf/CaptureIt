@@ -40,14 +40,14 @@ app.listen(3000, () => {
 /**-----SignUp and Login Routes ------- */
 app.post('/signup', async(req,res) =>{
     try{
-      const {username, email, password} = req.body;
-      // hash the password
+      const {username, firstName, lastName, email, password} = req.body;
+      // hash the password before inserting
       const hashedPassword = await bcrypt.hash(password, 10);
       const signUpConnection = await getDbConnection();
       /**We pass in the values */
       const [insertUserRow] = await signUpConnection.execute(
-      'INSERT INTO Users (Username, Email, PasswordHash) VALUES (?, ?, ?)',
-      [username, email, hashedPassword])
+      'INSERT INTO Users (Username, Email, PasswordHash, FirstName, LastName) VALUES (?, ?, ?, ?, ?)',
+      [username, email, hashedPassword, firstName, lastName])
 
       await signUpConnection.end();
       res.status(201).send('User created successfully');
@@ -81,6 +81,7 @@ app.post('/login', async(req,res) =>{
       }
 
       /**this tokeen will be available for 24h before expiring */
+      /**Also want to be able to go to the profile page without needing to login again */
       const token = jwt.sign({ userId: user.UserID }, process.env.JWT_SECRET_KEY, { expiresIn: '24h' });
       /**Keychain in iOS */
       res.send({ token });
