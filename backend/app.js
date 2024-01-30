@@ -1,93 +1,176 @@
 require('dotenv').config();
 const express = require('express');
-const mysql = require('mysql2');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const cors = require('cors');
+const User = require('./models/User');
+const mongoose = require('mongoose');
 
 const app = express();
 app.use(express.json()); // For parsing application/json
+app.use(cors());
 
-// Configure MySQL connection
+// Configure Mongoose Connection connection
 
-dbConfig = {
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME
-}
+const uri = process.env.DB_URI;
+
+mongoose.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true })
+   .then(() => console.log('MongoDB connected successfully'))
+   .catch(err => console.error('MongoDB connection error:', err));
 
 
-async function getDbConnection() {
-  return await mysql.createConnection(dbConfig);
-}
 
-// Connect to MySQL
-connection.connect(err => {
-  if (err) {
-    console.error('An error occurred while connecting to the MySQL server:', err);
-    process.exit(1); // Optionally exit the process with an error code
-  } else {
-    console.log('Connected to the MySQL server.');
+// Defining connection
+app.listen(5001, () => {
+  console.log('Server is running on port 5001');
+});
+
+/**-----SignUp and Login Routes ------- */
+
+app.post('/signup', async (req, res) => {
+  try {
+    const { username, firstName, lastName, formattedEmail, password } = req.body;
+
+    // Hash the password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create a new user instance and save it to the database
+    const newUser = new User({
+      username,
+      email: formattedEmail,
+      passwordHash: hashedPassword,
+      firstName,
+      lastName
+    });
+
+    const result = await newUser.save();
+
+    console.log(result);
+    res.status(201).send('User created successfully');
+  } catch (error) {
+    console.error("Log", error);
+    res.status(500).send('Error occurred');
   }
 });
 
 
-// Defining connection
-app.listen(3000, () => {
-  console.log('Server is running on port 3000');
+app.post('/login', async (req, res) => {
+  try {
+    const { formattedUsername, password } = req.body;
+    // Find the user by email
+    const user = await User.findOne({ username: formattedUsername });
+
+    if (!user) {
+      return res.status(401).send('User not found.');
+    }
+
+    // Compare the provided password with the stored hash
+    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isPasswordValid) {
+      return res.status(401).send('Password Invalid');
+    }
+
+    // Generate a token valid for 24 hours
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET_KEY, { expiresIn: '24h' });
+
+    res.send({ token });
+  } catch (error) {
+    console.log(error);
+    res.status(500).send("Error has occurred within login");
+  }
 });
 
-/**-----SignUp and Login Routes ------- */
-app.post('/signup', async(req,res) =>{
-    try{
-      const {username, firstName, lastName, email, password} = req.body;
-      // hash the password before inserting
-      const hashedPassword = await bcrypt.hash(password, 10);
-      const signUpConnection = await getDbConnection();
-      /**We pass in the values */
-      const [insertUserRow] = await signUpConnection.execute(
-      'INSERT INTO Users (Username, Email, PasswordHash, FirstName, LastName) VALUES (?, ?, ?, ?, ?)',
-      [username, email, hashedPassword, firstName, lastName])
 
-      await signUpConnection.end();
-      res.status(201).send('User created successfully');
+/**Profile page */
 
-    } catch(error){
-        console.error(error);
-        res.status(500).send('Error occurred');
+/**Grab info from the User */
+
+app.get('/user/:username', async(req,res)=>{
+  try{
+    const username = req.params.username;
+    const user = await User.findOne({ username: username });
+    // Simple error checking
+    if (!user) {
+      return res.status(404).send('User not found.');
     }
+    // Send all details of that user for the frontend to use
+    res.json(user);
+    
+  } catch(error){
+    res.status(500).send("Server error");
+  }
+})
+
+app.get('/posts/:username', async (req, res) => {
+  try {
+    const username = req.params.username;
+    // Find the user to get their ObjectId
+    const user = await User.findOne({ username: username });
+
+    if (!user) {
+      return res.status(404).send('User not found');
+    }
+
+    // Find posts by the ObjectId of the user
+    const posts = await Post.find({ user: user._id });
+
+    if (posts.length === 0) {
+      return res.status(404).send('Posts not found');
+    }
+
+    res.json(posts);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Error fetching posts');
+  }
 });
 
-app.post('/login', async(req,res) =>{
-    try{
-      const {email, password} = req.body;
-      const loginConnection = await getDbConnection();
-
-      /**Always verify if the email works to save time*/
-      /** we will return everything from it and compare the hasedpassword with the one from SQL */
-      const [users] = await loginConnection.execute('SELECT * FROM User WHERE Email = ?',[email]);
-
-      await loginConnection.end();
-
-      if(users.length == 0){
-        return res.status(401).send('User not found.');
-      }
-
-      const user = users[0];
-
-      const isPasswordValid = await bcrypt.compare(password, user.PasswordHash);
-      if(!isPasswordValid){
-        return res.status(401).send('Password Invalid');
-      }
-
-      /**this tokeen will be available for 24h before expiring */
-      /**Also want to be able to go to the profile page without needing to login again */
-      const token = jwt.sign({ userId: user.UserID }, process.env.JWT_SECRET_KEY, { expiresIn: '24h' });
-      /**Keychain in iOS */
-      res.send({ token });
 
 
-    } catch(error){
-        res.send(500).send("Error has occurred within signup");
+
+/**Update/Posts  */
+
+
+app.post('/post/:username', async (req, res) => {
+
+  
+  try {
+    const { username, photoUrl, caption, location } = req.body;
+
+    const newPost = new Post({
+      userId,
+      photoUrl,
+      caption,
+      location
+    });
+
+    const savedPost = await newPost.save();
+    res.status(201).json(savedPost);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Error creating post');
+  }
+});
+
+
+// In your Express server (e.g., server.js)
+app.put('/user/:username/bio', async (req, res) => {
+  try {
+    const username = req.params.username;
+    const { bio } = req.body; 
+
+    const user = await User.findOneAndUpdate(
+      { username: username },
+      { bio: bio },
+      { new: true } // Returns the updated document
+    );
+
+    if (!user) {
+      return res.status(404).send('User not found');
     }
+
+    res.json(user);
+  } catch (error) {
+    res.status(500).send('Server error');
+  }
 });

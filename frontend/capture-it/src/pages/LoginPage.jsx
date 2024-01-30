@@ -5,7 +5,7 @@ import { useState } from 'react';
 
 function LoginPage() {
 
-    const [email, setEmail] = useState("");
+    const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
 
 
@@ -18,28 +18,31 @@ function LoginPage() {
      const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
+       const formattedUsername = username.trim().toLowerCase();
         e.preventDefault(); // Prevents default form submission behavior
 
         setLoading(true);
         // reset the error
         setError('');
         try {
-            const response = await fetch('http://localhost:5000/login', { // Use your backend API URL
+            const response = await fetch('http://localhost:5001/login', { // Use your backend API URL
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ email, password }) // Add other fields as necessary
+                body: JSON.stringify({ formattedUsername, password }) // Add other fields as necessary
             });
-    
+
+            console.log(response);
+
             if(response.ok){
-                navigate("/profile");
+                // grab response data because we want the token (not just status code)
+                const responseData = await response.json();
+                localStorage.setItem('token', responseData.token); // Store the token
+                navigate(`/profile/${formattedUsername}`);
             } else{
-                setError("Could not login.");
+                setError('Could not login. Please check your credentials.');
             }
-            // const responseData = await response.json();
-            // console.log(responseData);
-            // Handle response data
         } catch (error) {
             setError('An error occurred. Please try again.');
         }
@@ -50,7 +53,6 @@ function LoginPage() {
     };
     
   return (
-
     // wrap the entire thing in a box like containr 
     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: 4 }}>
       <Typography variant="h4" component="h1" gutterBottom style={{ fontWeight: 'bold' }}>
@@ -58,15 +60,15 @@ function LoginPage() {
       </Typography>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex',alignItems: 'center' ,justifyContent: 'center', flexDirection: 'column', width: '50%'}}>
-            <TextField
-                label="Email"
-                type="email"
+        <TextField
+                label="Username"
+                type="text"
                 variant="outlined"
                 margin="normal"
                 required
                 fullWidth
                 style={{width: '50%'}}
-                onChange={(e)=>setEmail(e.target.value)}
+                onChange={(e)=> setUsername(e.target.value)}
             />
 
             <TextField
@@ -83,14 +85,16 @@ function LoginPage() {
             <Typography variant="body2" style={{ color: 'red' }}>{error}</Typography>
 
             <Button
-            variant="contained"
-            color="primary"
-            style={{ 
-                backgroundColor: 'black', 
-                color: 'white', 
-                margin: '20px 0',
-                width: '50%' // Set the width to 50%
-            }}
+                variant="contained"
+                color="primary"
+                type="submit"
+                disable={loading}
+                style={{ 
+                    backgroundColor: 'black', 
+                    color: 'white', 
+                    margin: '20px 0',
+                    width: '50%' // Set the width to 50%
+                }}
             >
                 {loading ? "Loading..." : "Login"}
             </Button>

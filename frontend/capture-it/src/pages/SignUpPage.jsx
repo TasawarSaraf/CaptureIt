@@ -23,7 +23,7 @@ function SignUpPage(){
 
     const handleSubmit = async (e) => {
         e.preventDefault(); // Prevents default form submission behavior
-    
+        const formattedEmail = email.trim().toLowerCase();
         setLoading(true);
         // reset the error
         setError('');
@@ -34,12 +34,12 @@ function SignUpPage(){
             return;
         }
         try {
-            const response = await fetch('http://localhost:5000/signup', { // Use your backend API URL
+            const response = await fetch('http://localhost:5001/signup', { // Use your backend API URL
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({username, firstName, lastName, email, password }) // Add other fields as necessary
+                body: JSON.stringify({username, firstName, lastName, formattedEmail, password }) // Add other fields as necessary
             });
 
             if(response.ok){
