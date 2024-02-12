@@ -202,3 +202,96 @@ app.put('/user/:username/bio', async (req, res) => {
     res.status(500).send('Server error');
   }
 });
+
+
+
+/** Liking and Unliking Photo */
+
+app.post('/post/:postId/like', async (req, res) => {
+  const { postId } = req.params;
+  const userId = req.body.userId; // Assuming the user's ID is sent in the request body
+
+  try {
+      const post = await Post.findById(postId);
+
+      if (!post) {
+          return res.status(404).send('Post not found');
+      }
+
+      // Check if the user has already liked the post
+      const index = post.likes.indexOf(userId);
+
+      if (index === -1) {
+          // If the user has not liked the post meanign couldn't find their ID , then push it
+          post.likes.push(userId);
+      } else {
+           // The user has already liked the post, so unlike it by removing the user's ID from the likes array.
+          post.likes.splice(index, 1);
+      }
+
+      await post.save();
+      res.status(200).json(post);
+  } catch (error) {
+      console.error(error);
+      res.status(500).send('Error processing like/unlike');
+  }
+});
+
+
+
+app.post('/user/:id/follow', async (req, res) => {
+  const userId = req.body.userId; // The ID of the user who is performing the follow action
+  const targetUserId = req.params.id; // The ID of the user to be followed
+
+  if(userId === targetUserId){
+    return res.status(400).send("Users cannot follow themselves.");
+  }
+
+  try {
+    // Add target user to the current user's following array
+    await User.findByIdAndUpdate(userId, 
+      { $addToSet: { following: targetUserId } }, // Prevents duplicate entries
+      { new: true });
+
+    // Add current user to the target user's followers array
+    await User.findByIdAndUpdate(targetUserId, 
+      { $addToSet: { followers: userId } }, // Prevents duplicate entries
+      { new: true });
+
+    res.status(200).send("Followed successfully");
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Error processing follow');
+  }
+});
+
+
+
+
+app.post('/user/:id/unfollow', async (req, res) => {
+  const userId = req.body.userId; // The ID of the user who is performing the unfollow action
+  const targetUserId = req.params.id; // The ID of the user to be unfollowed
+
+  try {
+    // Remove target user from the current user's following array
+    await User.findByIdAndUpdate(userId, 
+      { $pull: { following: targetUserId } },
+      { new: true });
+
+    // Remove current user from the target user's followers array
+    await User.findByIdAndUpdate(targetUserId, 
+      { $pull: { followers: userId } },
+      { new: true });
+
+    res.status(200).send("Unfollowed successfully");
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Error processing unfollow');
+  }
+});
+
+
+
+
+
+
