@@ -101,6 +101,24 @@ app.get('/user/:username', async(req,res)=>{
   }
 })
 
+
+/**Get the list of posts from the homepage*/
+app.get('/feed', async (req, res) => {
+  try {
+    // Fetch all posts and populate the 'user' field to include user details
+    // Sort by 'postDate' in descending order
+    // Adjust the fields you want from 'User'
+    const posts = await Post.find({}).populate('user', 'username').sort('-postDate');
+    res.status(200).json(posts);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Error fetching posts');
+  }
+});
+
+
+/**getting posts of the user */
+
 app.get('/posts/:username', async (req, res) => {
   try {
     const username = req.params.username;
@@ -128,14 +146,24 @@ app.get('/posts/:username', async (req, res) => {
 
 
 
-/**Update/Posts  */
 
 
-app.post('/post/:username', async (req, res) => {
+/**Posting post based on username  */
 
-  
+
+app.post('/post/:username', async (req, res) => {  
   try {
-    const { username, photoUrl, caption, location } = req.body;
+    const {photoUrl, caption, location } = req.body;
+
+    const username = req.params.username;
+
+    const user = await User.findOne({username: username});
+
+    if (!user) {
+      return res.status(404).send('User not found');
+    }
+
+    const userId = user.id;
 
     const newPost = new Post({
       userId,
